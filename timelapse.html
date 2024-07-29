@@ -99,13 +99,15 @@
         }
     </style>
     <script>
+        var ip;
+        var name;
         async function updateVideo() {
             try {
                 // Show loading indicator
                 document.querySelector('.loading-indicator').style.display = 'block';
 
                 // Request video update
-                const updateResponse = await fetch('http://localhost:5000/timelapse_video/update');
+                const updateResponse = await fetch(`http://${ip}/timelapse_video/update?session_id=${name}`);
                 
                 if (updateResponse.ok) {
                     console.log('Video update started.');
@@ -126,9 +128,10 @@
 
         function loadVideo() {
             const videoElement = document.getElementById('timelapseVideo');
-            const ip = getIpFromUrl();
+            ip = getIpFromUrl();
+            name = getNameFromUrl();
             if (ip) {
-                videoElement.src = `http://${ip}/timelapse_video`;
+                videoElement.src = `http://${ip}/timelapse_video?session_id=${name}`;
                 videoElement.load();
                 videoElement.play();
             } else {
@@ -139,6 +142,10 @@
         function getIpFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get('ip');
+        }
+        function getNameFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('name');
         }
 
         window.onload = function() {

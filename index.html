@@ -7,7 +7,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; }
-        header { background-color: #82c1e4; color: white; padding: 20px; width: 100%; text-align: center; font-size: 24px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); }
+        header { background-color: #82c1e4; color: white; padding: 20px; width: 100%; text-align: center; font-size: 24px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); position: relative; }
+        .header-icon { position: absolute; right: 20px; top: 20px; cursor: pointer; font-size: 20px; }
         .section { margin: 20px 0; width: 80%; }
         .section-header { display: flex; justify-content: space-between; align-items: center; background-color: #659dbd; color: white; padding: 10px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
         .section-header h2 { margin: 0; display: flex; align-items: center; }
@@ -36,6 +37,9 @@
         .card .delete-btn { right: 10px; }
     </style>
     <script>
+        // baseUrl을 localStorage에서 불러옵니다. 없으면 기본값을 사용합니다.
+        let baseUrl = localStorage.getItem('base_url') || 'http://127.0.0.1:5000';
+
         function openModal(section, action, cardId) {
             const modal = document.getElementById(`${section}-modal`);
             modal.style.display = 'flex';
@@ -97,15 +101,15 @@
                     const cardHtml = section === 'camera'
                         ? `
                             <h3><i class="fas fa-video"></i> ${card.name}</h3>
-                            <div class="thumbnail" id="thumbnail-${key.replace(/\./g, '-').replace(/:/g, '-')}" data-ip="${card.ip}">
+                            <div class="thumbnail" id="thumbnail-${card.name}" data-ip="${card.ip}">
                                 <div class="offline-status">OFFLINE</div>
                                 <div class="online-status">ONLINE</div>
                             </div>
                             <div class="controls">
-                                <button class="button" onclick="openCameraStream('${card.ip}')">
+                                <button class="button" onclick="openCameraStream('${card.ip}', '${card.name}')">
                                     <i class="fas fa-video"></i> Live Stream
                                 </button>
-                                <button class="button" onclick="openTimelapse('${card.ip}')">
+                                <button class="button" onclick="openTimelapse('${card.ip}', '${card.name}')">
                                     <i class="fas fa-clock"></i> Timelapse
                                 </button>
                                 <button class="edit-btn" onclick="openModal('camera', 'edit', '${key}')">
@@ -149,11 +153,11 @@
                     container.appendChild(cardElement);
                     // 썸네일 로딩 후 상태 업데이트
                     if (section === 'camera') {
-                        const thumbnail = document.getElementById(`thumbnail-${key.replace(/\./g, '-').replace(/:/g, '-')}`);
+                        const thumbnail = document.getElementById(`thumbnail-${card.name}`);
                         if (thumbnail) {
                             const img = new Image();
                             img.onload = () => {
-                                thumbnail.style.backgroundImage = `url('http://${card.ip}/getthumb')`;
+                                thumbnail.style.backgroundImage = `url('http://${card.ip}/getthumb?session_id=${card.name}')`;
                                 thumbnail.querySelector('.offline-status').style.display = 'none';
                                 thumbnail.querySelector('.online-status').style.display = 'block';
                             };
@@ -162,7 +166,7 @@
                                 thumbnail.querySelector('.offline-status').style.display = 'block';
                                 thumbnail.querySelector('.online-status').style.display = 'none';
                             };
-                            img.src = `http://${card.ip}/getthumb`;
+                            img.src = `http://${card.ip}/getthumb?session_id=${card.name}`;
                         }
                     } else if (section === 'temperature') {
                         // 온도 데이터 로딩
@@ -179,12 +183,12 @@
             }
         }
     
-        function openCameraStream(ip) {
-            location.href=(`./camera.html?ip=`+ip);
+        function openCameraStream(ip, name) {
+            location.href = (`./camera.html?ip=${ip}&name=${name}`);
         }
     
-        function openTimelapse(ip) {
-            location.href = ('./timelapse.html?ip='+ip);
+        function openTimelapse(ip, name) {
+            location.href = (`./timelapse.html?ip=${ip}&name=${name}`);
         }
     
         function toggleLight(ip) {
@@ -193,15 +197,51 @@
                 .then(data => alert(`Light toggled: ${data.status}`));
         }
     
+        function fetchSessionAndRenderCards() {
+            fetch(`${baseUrl}/activated`)
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(session => {
+                        const cardId = `camera-${session.session_id}`;
+                        localStorage.setItem(cardId, JSON.stringify({
+                            name: `${session.session_id}`,
+                            ip: `${session.server_ip}`
+                        }));
+                    });
+                    renderCards('camera');
+                })
+                .catch(error => console.error('Error fetching session:', error));
+        }
+
+        function openSettingsModal() {
+            document.getElementById('settings-modal').style.display = 'flex';
+            document.getElementById('base-url').value = baseUrl; // 현재 baseUrl을 모달에 채우기
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        function saveBaseUrl() {
+            baseUrl = document.getElementById('base-url').value;
+            localStorage.setItem('base_url', baseUrl); // base_url을 localStorage에 저장
+            closeSettingsModal();
+            fetchSessionAndRenderCards();
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
-            renderCards('camera');
+            fetchSessionAndRenderCards();
             renderCards('light');
             renderCards('temperature');
         });
     </script>
 </head>
 <body>
-    <header>Smart Aquarium Dashboard</header>
+    <header>
+        Smart Aquarium Dashboard
+        <i class="fas fa-cog header-icon" onclick="openSettingsModal()"></i>
+    </header>
+
     <div class="section camera">
         <div class="section-header">
             <h2><i class="fas fa-video"></i> Camera List</h2>
@@ -209,6 +249,7 @@
         </div>
         <div class="container"></div>
     </div>
+
     <div class="section light">
         <div class="section-header">
             <h2><i class="fas fa-lightbulb"></i> Light List</h2>
@@ -216,6 +257,7 @@
         </div>
         <div class="container"></div>
     </div>
+
     <div class="section temperature">
         <div class="section-header">
             <h2><i class="fas fa-thermometer-half"></i> Temperature List</h2>
@@ -257,6 +299,15 @@
             <input type="hidden" id="temperature-cardId">
             <button class="button" onclick="addOrEditCard('temperature')">Save</button>
             <button class="button" onclick="closeModal('temperature')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <input type="text" id="base-url" placeholder="Base URL">
+            <button class="button" onclick="saveBaseUrl()">Save</button>
+            <button class="button" onclick="closeSettingsModal()">Cancel</button>
         </div>
     </div>
 </body>

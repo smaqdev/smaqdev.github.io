@@ -98,13 +98,14 @@
         window.onload = function() {
             const urlParams = new URLSearchParams(window.location.search);
             const ip = urlParams.get('ip');
+            const name = urlParams.get('name');
             if (!ip) {
                 alert('No IP address provided.');
                 return;
             }
 
             const img = document.createElement('img');
-            img.src = `http://${ip}/video_feed.mjpg`;
+            img.src = `http://${ip}/video_feed.mjpg?session_id=${name}`;
             img.alt = 'MJPEG Stream';
             document.querySelector('.container').appendChild(img);
         };
